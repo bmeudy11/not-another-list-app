@@ -52,6 +52,6 @@ unit-test-job:   # This job runs in the test stage.
   image: aymdev/dind-compose
   before_script:
     - docker-compose build --parallel
-    - docker-compose up -d api db
+    - docker-compose up -d natl_backend_api db
   script:
     - docker-compose run --rm test || exit $?
