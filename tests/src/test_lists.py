@@ -28,8 +28,8 @@ class ListTestCase(unittest.TestCase):
         helper.lists_delete(username='unittest1', password='unittest1',name='test2')
 
 
-    def test_lists_delete(self):
-        assert helper.lists_delete(username='unittest1', password='unittest1', name='test').json() == True
+    #def test_lists_delete(self):
+    #    assert helper.lists_delete(username='unittest1', password='unittest1', name='test').json() == True
 
     def tearDown(self):
         # Delete List
