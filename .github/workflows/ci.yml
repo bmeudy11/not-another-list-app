@@ -17,7 +17,7 @@ jobs:
       - name: Show Docker and Docker Compose info
         run: |
           docker --version
-          docker-compose --version
+          docker compose version
 
       - name: Free disk space
         run: |
@@ -25,8 +25,8 @@ jobs:
           sudo rm -rf /usr/local/lib/android
           docker image prune -a -f
 
-      - name: Build containers with docker-compose
-        run: docker-compose build
+      - name: Build containers with docker compose
+        run: docker compose build
 
   flake8:
     name: Static analysis - flake8
@@ -59,14 +59,14 @@ jobs:
       - name: Show Docker and Docker Compose info
         run: |
           docker --version
-          docker-compose --version
+          docker compose version
 
       - name: Build required containers
-        run: docker-compose build --parallel
+        run: docker compose build --parallel
 
       - name: Start backend and db services
-        run: docker-compose up -d natl_backend_api db
+        run: docker compose up -d natl_backend_api db
 
       - name: Run tests (inside test container)
         # If tests fail, this step will fail the job
-        run: docker-compose run --rm test
+        run: docker compose run --rm test
