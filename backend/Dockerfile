@@ -11,12 +11,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libyaml-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip, setuptools, and wheel BEFORE installing requirements
-RUN pip install --upgrade pip setuptools wheel
+# Upgrade pip to latest first, then setuptools and wheel
+RUN python -m pip install --no-cache-dir --upgrade 'pip>=24.0' setuptools wheel
 
 COPY ./src/requirements.txt /src
-# Install requirements with --no-cache-dir to reduce layer size and avoid cache issues
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install requirements with pip cache disabled and prefer binary wheels  
+RUN pip install --no-cache-dir --prefer-binary --disable-pip-version-check -r requirements.txt
 
 COPY ./src/ /src
 
