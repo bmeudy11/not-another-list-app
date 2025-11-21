@@ -5,17 +5,17 @@ LABEL maintainer="newtonmccollum@gmail.com"
 WORKDIR /src
 
 # Install system dependencies needed to build Python packages with C extensions
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     python3-dev \
     libyaml-dev \
-    gcc \
-    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install -U requests pytest
-    
+# Upgrade pip, setuptools, and wheel BEFORE installing requirements
+RUN pip install --upgrade pip setuptools wheel
+
+RUN pip install --no-cache-dir -U requests pytest
+
 COPY wait-for-it.sh /
 RUN chmod +x /wait-for-it.sh
 
