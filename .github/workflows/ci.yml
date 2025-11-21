@@ -14,6 +14,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install system dependencies for building wheels
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev yaml-dev libyaml-dev
+
       - name: Install docker-compose
         run: |
           python3 -m pip install --upgrade pip
@@ -52,6 +57,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install system dependencies for building wheels
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev yaml-dev libyaml-dev
 
       - name: Install docker-compose
         run: |
