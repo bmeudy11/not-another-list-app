@@ -11,7 +11,7 @@ const listReducer = (state = initialState, action) => {
     case constants.SET_LISTS:
       return {
         ...state,
-        list: action.payload
+        list: Array.isArray(action.payload) ? action.payload : []
       };
     case constants.SWITCH_SHOW_ADD_LIST_FORM:
       return {
