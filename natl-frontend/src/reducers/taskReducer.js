@@ -13,7 +13,7 @@ const taskReducer = (state = initialState, action) => {
     case constants.SET_TASKS:
       return {
         ...state,
-        tasks: action.payload
+        tasks: Array.isArray(action.payload) ? action.payload : []
       };
     case constants.SET_TASKS_LIST_NAME:
       return {
