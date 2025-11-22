@@ -1,13 +1,8 @@
-name: Trivy Security Scan
+name: Trivy Security Scan (Dependency Vulnerability Scanning)
 
 on:
-  push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
-  schedule:
-    # Run daily at 2 AM UTC
-    - cron: '0 2 * * *'
+    branches: [ "main" ]
 
 jobs:
   trivy-scan:
