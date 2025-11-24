@@ -245,9 +245,18 @@ jobs:
           
           let retireData = [];
           try {
-            retireData = JSON.parse(fs.readFileSync('retire-results.json', 'utf8'));
+            const rawData = JSON.parse(fs.readFileSync('retire-results.json', 'utf8'));
+            // RetireJS can return either an array or an object with a 'data' property
+            if (Array.isArray(rawData)) {
+              retireData = rawData;
+            } else if (rawData && rawData.data && Array.isArray(rawData.data)) {
+              retireData = rawData.data;
+            } else if (rawData && typeof rawData === 'object') {
+              // If it's an object, wrap it in an array
+              retireData = [rawData];
+            }
           } catch (e) {
-            console.log('No retire results found');
+            console.log('No retire results found or error parsing:', e.message);
             retireData = [];
           }
           
@@ -269,8 +278,11 @@ jobs:
 
           const rulesMap = {};
 
-          retireData.forEach(file => {
-            if (file.results) {
+          // Handle both array of files and individual file objects
+          const files = Array.isArray(retireData) ? retireData : [retireData];
+          
+          files.forEach(file => {
+            if (file && file.results) {
               file.results.forEach(result => {
                 if (result.vulnerabilities) {
                   result.vulnerabilities.forEach(vuln => {
