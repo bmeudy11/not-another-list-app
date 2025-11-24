@@ -379,11 +379,11 @@ jobs:
           echo "# Frontend SAST Security Analysis Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Analysis Tools Run:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ ESLint with security plugins" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ npm audit (dependency vulnerabilities)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Semgrep (React & OWASP security rules)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ RetireJS (vulnerable JavaScript libraries)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ CodeQL (advanced semantic analysis)" >> $GITHUB_STEP_SUMMARY
+          echo "- ESLint with security plugins" >> $GITHUB_STEP_SUMMARY
+          echo "- npm audit (dependency vulnerabilities)" >> $GITHUB_STEP_SUMMARY
+          echo "- Semgrep (React & OWASP security rules)" >> $GITHUB_STEP_SUMMARY
+          echo "- RetireJS (vulnerable JavaScript libraries)" >> $GITHUB_STEP_SUMMARY
+          echo "- CodeQL (advanced semantic analysis)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Results Location" >> $GITHUB_STEP_SUMMARY
           echo "All security findings have been uploaded to the **Security** tab." >> $GITHUB_STEP_SUMMARY
