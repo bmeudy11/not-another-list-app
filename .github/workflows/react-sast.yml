@@ -2,15 +2,15 @@ name: React SAST (Security-Focused Static Code Analysis)
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
     paths:
       - 'natl-frontend/**'
-      - '.github/workflows/frontend-sast.yml'
+      - '.github/workflows/react-sast.yml'
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
     paths:
       - 'natl-frontend/**'
-      - '.github/workflows/frontend-sast.yml'
+      - '.github/workflows/react-sast.yml'
   schedule:
     # Run weekly on Mondays at 3 AM UTC
     - cron: '0 3 * * 1'
