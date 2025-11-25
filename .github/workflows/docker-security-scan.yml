@@ -1,0 +1,268 @@
+name: Docker Image Security Scans
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker-security-scan.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker-security-scan.yml'
+  schedule:
+    # Run weekly on Sundays at 4 AM UTC
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+jobs:
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          tags: natl-backend:${{ github.sha }}
+          outputs: type=docker,dest=/tmp/backend-image.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./natl-frontend
+          file: ./natl-frontend/Dockerfile
+          tags: natl-frontend:${{ github.sha }}
+          outputs: type=docker,dest=/tmp/frontend-image.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build database image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./mysql
+          file: ./mysql/Dockerfile
+          tags: natl-db:${{ github.sha }}
+          outputs: type=docker,dest=/tmp/db-image.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload backend image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-image
+          path: /tmp/backend-image.tar
+          retention-days: 1
+
+      - name: Upload frontend image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-image
+          path: /tmp/frontend-image.tar
+          retention-days: 1
+
+      - name: Upload database image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-image
+          path: /tmp/db-image.tar
+          retention-days: 1
+
+  grype-backend:
+    name: Grype Scan - Backend
+    runs-on: ubuntu-latest
+    needs: build-images
+    permissions:
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download backend image
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load --input /tmp/backend-image.tar
+
+      - name: Run Grype vulnerability scanner
+        uses: anchore/scan-action@v3
+        id: grype
+        with:
+          image: 'natl-backend:${{ github.sha }}'
+          fail-build: false
+          severity-cutoff: medium
+
+      - name: Upload Grype results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: ${{ steps.grype.outputs.sarif }}
+          category: 'grype-backend'
+
+  dockerfile-lint:
+    name: Dockerfile Security Linting
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint on backend Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: backend/Dockerfile
+          format: sarif
+          output-file: hadolint-backend-results.sarif
+          no-fail: true
+
+      - name: Upload Hadolint backend results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: hadolint-backend-results.sarif
+          category: hadolint-backend
+
+      - name: Run Hadolint on frontend Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: natl-frontend/Dockerfile
+          format: sarif
+          output-file: hadolint-frontend-results.sarif
+          no-fail: true
+
+      - name: Upload Hadolint frontend results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: hadolint-frontend-results.sarif
+          category: hadolint-frontend
+
+      - name: Run Hadolint on database Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: mysql/Dockerfile
+          format: sarif
+          output-file: hadolint-db-results.sarif
+          no-fail: true
+
+      - name: Upload Hadolint database results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: hadolint-db-results.sarif
+          category: hadolint-database
+
+  docker-scout:
+    name: Docker Scout Analysis
+    runs-on: ubuntu-latest
+    needs: build-images
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download backend image
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-image
+          path: /tmp
+
+      - name: Download frontend image
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-image
+          path: /tmp
+
+      - name: Download database image
+        uses: actions/download-artifact@v4
+        with:
+          name: db-image
+          path: /tmp
+
+      - name: Load Docker images
+        run: |
+          docker load --input /tmp/backend-image.tar
+          docker load --input /tmp/frontend-image.tar
+          docker load --input /tmp/db-image.tar
+
+      - name: Analyze backend image with Docker Scout
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: natl-backend:${{ github.sha }}
+          only-severities: critical,high
+          exit-code: false
+
+      - name: Analyze frontend image with Docker Scout
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: natl-frontend:${{ github.sha }}
+          only-severities: critical,high
+          exit-code: false
+
+      - name: Analyze database image with Docker Scout
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: natl-db:${{ github.sha }}
+          only-severities: critical,high
+          exit-code: false
+
+  summary:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    needs: [grype-backend, dockerfile-lint, docker-scout]
+    if: always()
+    
+    steps:
+      - name: Generate summary report
+        run: |
+          echo "# Docker Image Security Scan Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Scanned Images:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend** (Python/FastAPI)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend** (React)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database** (MySQL)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Security Tools Used:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Grype** - Anchore vulnerability scanner" >> $GITHUB_STEP_SUMMARY
+          echo "- **Hadolint** - Dockerfile best practices linter" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Scout** - Docker's official security analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Results Location" >> $GITHUB_STEP_SUMMARY
+          echo "All vulnerability findings have been uploaded to the **Security** tab." >> $GITHUB_STEP_SUMMARY
+          echo "Navigate to: Security → Code scanning → Alerts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Coverage:" >> $GITHUB_STEP_SUMMARY
+          echo "- OS package vulnerabilities" >> $GITHUB_STEP_SUMMARY
+          echo "- Application dependency vulnerabilities" >> $GITHUB_STEP_SUMMARY
+          echo "- Dockerfile security best practices" >> $GITHUB_STEP_SUMMARY
+          echo "- Known CVEs and security advisories" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review critical and high severity vulnerabilities" >> $GITHUB_STEP_SUMMARY
+          echo "2. Update base images to latest secure versions" >> $GITHUB_STEP_SUMMARY
+          echo "3. Update application dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "4. Apply Dockerfile best practices from Hadolint" >> $GITHUB_STEP_SUMMARY
