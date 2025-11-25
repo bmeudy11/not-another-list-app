@@ -6,16 +6,33 @@ Tests for backend API models, CRUD operations, and database functionality
 import pytest
 import sys
 import os
+import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 
 # Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+src_path = os.path.join(os.path.dirname(__file__), 'src')
+sys.path.insert(0, src_path)
+
+# Create a mock config file if it doesn't exist (for testing)
+config_dir = os.path.join(src_path, 'config')
+config_file = os.path.join(config_dir, 'dev.config.json')
+if not os.path.exists(config_file):
+    os.makedirs(config_dir, exist_ok=True)
+    mock_config = {
+        "databaseName": "test_db",
+        "databaseIp": "localhost",
+        "databasePort": "3306",
+        "databaseUsername": "test",
+        "databasePassword": "test"
+    }
+    with open(config_file, 'w') as f:
+        json.dump(mock_config, f)
 
 import models
 import schemas
 import crud
-from database import Base
 
 
 # Test database setup
@@ -26,9 +43,10 @@ TEST_DATABASE_URL = "sqlite:///./test.db"
 def db_engine():
     """Create a test database engine"""
     engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-    Base.metadata.create_all(bind=engine)
+    # Use models.Base which has all the table definitions
+    models.Base.metadata.create_all(bind=engine)
     yield engine
-    Base.metadata.drop_all(bind=engine)
+    models.Base.metadata.drop_all(bind=engine)
     # Clean up the test database file
     if os.path.exists("./test.db"):
         os.remove("./test.db")
