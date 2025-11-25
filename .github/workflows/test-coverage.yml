@@ -28,7 +28,7 @@ jobs:
           cd backend/src
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest-cov coverage
+          pip install pytest-cov coverage requests
 
       - name: Build and start database
         run: |
