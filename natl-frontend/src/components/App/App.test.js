@@ -8,8 +8,8 @@ import taskReducer from '../../reducers/taskReducer';
 
 const rootReducer = combineReducers({
   login: loginReducer,
-  list: listReducer,
-  task: taskReducer
+  lists: listReducer,
+  tasks: taskReducer
 });
 
 describe('App Component', () => {
@@ -26,8 +26,8 @@ describe('App Component', () => {
   it('renders Dashboard when logged in', () => {
     const initialState = {
       login: { accessId: 'test-123', username: 'testuser' },
-      list: { list: [], showAddList: false, name: '', description: '' },
-      task: { tasks: [], showAddTaskForm: false, name: '', description: '', taskListName: '', taskListId: '' }
+      lists: { list: [], showAddList: false, name: '', description: '' },
+      tasks: { tasks: [], showAddTaskForm: false, name: '', description: '', taskListName: '', taskListId: '' }
     };
     const store = createStore(rootReducer, initialState);
     

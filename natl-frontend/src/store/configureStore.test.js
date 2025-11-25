@@ -15,16 +15,16 @@ describe('configureStore', () => {
     expect(state.login).toBeDefined();
   });
 
-  it('should have list state', () => {
+  it('should have lists state', () => {
     const store = configureStore();
     const state = store.getState();
-    expect(state.list).toBeDefined();
+    expect(state.lists).toBeDefined();
   });
 
-  it('should have task state', () => {
+  it('should have tasks state', () => {
     const store = configureStore();
     const state = store.getState();
-    expect(state.task).toBeDefined();
+    expect(state.tasks).toBeDefined();
   });
 
   it('should initialize with correct default state', () => {
@@ -32,10 +32,10 @@ describe('configureStore', () => {
     const state = store.getState();
     
     expect(state.login.accessId).toBeUndefined();
-    expect(state.list.list).toEqual([]);
-    expect(state.list.showAddList).toBe(false);
-    expect(state.task.tasks).toEqual([]);
-    expect(state.task.showAddTaskForm).toBe(false);
+    expect(state.lists.list).toEqual([]);
+    expect(state.lists.showAddList).toBe(false);
+    expect(state.tasks.tasks).toEqual([]);
+    expect(state.tasks.showAddTaskForm).toBe(false);
   });
 
   it('should allow dispatching actions', () => {
