@@ -266,22 +266,14 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const coverage = process.env.FRONTEND_COVERAGE || 'N/A';
-            const color = process.env.FRONTEND_BADGE_COLOR || 'lightgrey';
-            const emoji = color === 'brightgreen' ? '✅' : color === 'yellow' ? '⚠️' : color === 'lightgrey' ? 'ℹ️' : '📊';
-            
-            let status = 'INFORMATIONAL';
-            if (coverage !== 'N/A') {
-              const coverageNum = parseFloat(coverage);
-              status = coverageNum >= 80 ? '✅ EXCELLENT' : '📊 TRACKED';
-            }
+            const coverage = process.env.FRONTEND_COVERAGE || '0';
+            const color = process.env.FRONTEND_BADGE_COLOR || 'red';
+            const emoji = color === 'brightgreen' ? '✅' : color === 'yellow' ? '⚠️' : '❌';
             
             const comment = `## ${emoji} Frontend Test Coverage: ${coverage}%
             
-            **Recommended Threshold:** 80%
-            **Status:** ${status}
-            
-            _Note: Frontend coverage is informational only and does not block the build._
+            **Minimum Required:** 80%
+            **Status:** ${parseFloat(coverage) >= 80 ? '✅ PASSED' : '❌ FAILED'}
             
             [View detailed coverage report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
             
@@ -310,15 +302,15 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.backend-coverage.result }}" == "success" ]; then
-            echo "- ✅ **Backend (Python):** PASSED (Required)" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ **Backend (Python):** PASSED" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- ❌ **Backend (Python):** FAILED (Required)" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ **Backend (Python):** FAILED" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [ "${{ needs.frontend-coverage.result }}" == "success" ]; then
-            echo "- ✅ **Frontend (React):** PASSED (Informational)" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ **Frontend (React):** PASSED" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- ℹ️ **Frontend (React):** See details (Informational - does not block build)" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ **Frontend (React):** FAILED" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -336,13 +328,10 @@ jobs:
 
       - name: Check overall status
         run: |
-          # Only backend coverage is required
-          if [ "${{ needs.backend-coverage.result }}" != "success" ]; then
-            echo "❌ Backend coverage check failed (required)"
+          # Both backend and frontend coverage are required
+          if [ "${{ needs.backend-coverage.result }}" != "success" ] || [ "${{ needs.frontend-coverage.result }}" != "success" ]; then
+            echo "❌ One or more coverage checks failed"
             exit 1
           else
-            echo "✅ Backend coverage check passed"
-            if [ "${{ needs.frontend-coverage.result }}" != "success" ]; then
-              echo "ℹ️ Frontend coverage is informational only and does not affect build status"
-            fi
+            echo "✅ All coverage checks passed"
           fi
