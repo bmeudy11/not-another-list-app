@@ -16,8 +16,12 @@ src_path = os.path.join(os.path.dirname(__file__), 'src')
 sys.path.insert(0, src_path)
 
 # Create a mock config file if it doesn't exist (for testing)
-config_dir = os.path.join(src_path, 'config')
+# database.py looks for config/dev.config.json relative to current directory
+# So we need to create it in the backend directory, not backend/src
+backend_path = os.path.dirname(__file__)
+config_dir = os.path.join(backend_path, 'config')
 config_file = os.path.join(config_dir, 'dev.config.json')
+
 if not os.path.exists(config_file):
     os.makedirs(config_dir, exist_ok=True)
     mock_config = {
@@ -29,6 +33,9 @@ if not os.path.exists(config_file):
     }
     with open(config_file, 'w') as f:
         json.dump(mock_config, f)
+
+# Also change to src directory so database.py can find the config
+os.chdir(src_path)
 
 import models
 import schemas
