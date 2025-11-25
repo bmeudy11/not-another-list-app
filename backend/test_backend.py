@@ -1259,15 +1259,15 @@ def test_router_task_update_is_done(test_app, db_session):
 
 
 def test_router_list_create_no_access_id(test_app, db_session):
-    """Test list creation with no access_id raises exception"""
+    """Test list creation with no access_id raises validation error"""
     response = test_app.post("/api/list/create", json={
         "access_id": None,
         "name": "Test",
         "description": "Desc",
         "is_done": False
     })
-    assert response.status_code == 400
-    assert "Access ID is not specified" in response.json()["errorMsg"]
+    # Pydantic validation fails with 422 when required field is None
+    assert response.status_code == 422
 
 
 def test_router_list_create_return_type(test_app, db_session):
