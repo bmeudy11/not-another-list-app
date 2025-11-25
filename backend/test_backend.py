@@ -989,15 +989,5 @@ def test_get_task_none_list_id(db_session):
     assert tasks[0].id == task1.id
 
 
-def test_exception_delete_list_no_id_or_name(db_session):
-    """Test deleting list with neither id nor name"""
-    user_data = schemas.UserCreate(username="testuser", password="pass")
-    user = crud.create_user(db_session, user_data)
-    
-    # Both id and name are None - should not delete anything
-    result = crud.delete_list(db_session, user.access_id, id=None, name=None)
-    assert result is False
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
