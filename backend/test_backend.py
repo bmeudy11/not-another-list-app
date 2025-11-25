@@ -990,5 +990,303 @@ def test_get_task_none_list_id(db_session):
     assert tasks[0].id == task1.id
 
 
+#########################
+#    Router Tests       #
+#########################
+
+@pytest.fixture(scope="function")
+def test_app(db_session):
+    """Create a test FastAPI app with overridden database dependency"""
+    from main import app
+    from database import get_db
+    
+    # Override the database dependency
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+    
+    app.dependency_overrides[get_db] = override_get_db
+    client = TestClient(app)
+    yield client
+    app.dependency_overrides.clear()
+
+
+def test_api_root(test_app):
+    """Test API root endpoint"""
+    response = test_app.get("/api/")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Connected!"}
+
+
+def test_router_register_user(test_app, db_session):
+    """Test user registration endpoint"""
+    response = test_app.post("/api/user/register", json={
+        "username": "testuser",
+        "password": "testpass"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["username"] == "testuser"
+    assert "access_id" in data
+    assert "id" in data
+
+
+def test_router_register_duplicate_user(test_app, db_session):
+    """Test registering duplicate user raises error"""
+    # Create first user
+    crud.create_user(db_session, schemas.UserCreate(username="duplicate", password="pass"))
+    
+    # Try to create duplicate
+    response = test_app.post("/api/user/register", json={
+        "username": "duplicate",
+        "password": "pass"
+    })
+    assert response.status_code == 400
+    assert "already exists" in response.json()["errorMsg"]
+
+
+def test_router_login_user(test_app, db_session):
+    """Test user login endpoint"""
+    # Create user
+    user = crud.create_user(db_session, schemas.UserCreate(username="loginuser", password="loginpass"))
+    
+    response = test_app.post("/api/user/login", json={
+        "username": "loginuser",
+        "password": "loginpass"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_id" in data
+    assert data["access_id"] == user.access_id
+
+
+def test_router_login_invalid_credentials(test_app, db_session):
+    """Test login with invalid credentials"""
+    response = test_app.post("/api/user/login", json={
+        "username": "nonexistent",
+        "password": "wrongpass"
+    })
+    assert response.status_code == 400
+    assert "Invalid Username/Password" in response.json()["errorMsg"]
+
+
+def test_router_delete_user_success(test_app, db_session):
+    """Test user deletion endpoint"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="deleteuser", password="deletepass"))
+    
+    response = test_app.post("/api/user/delete", json={
+        "username": "deleteuser",
+        "access_id": user.access_id,
+        "password": "deletepass"
+    })
+    assert response.status_code == 200
+    assert response.json()["msg"] == "Delete Successful"
+
+
+def test_router_delete_user_wrong_password(test_app, db_session):
+    """Test user deletion with wrong password"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="keepuser", password="keeppass"))
+    
+    response = test_app.post("/api/user/delete", json={
+        "username": "keepuser",
+        "access_id": user.access_id,
+        "password": "wrongpass"
+    })
+    assert response.status_code == 400
+    assert "Unable to Delete User" in response.json()["errorMsg"]
+
+
+def test_router_list_create(test_app, db_session):
+    """Test list creation endpoint"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="listuser", password="pass"))
+    
+    response = test_app.post("/api/list/create", json={
+        "access_id": user.access_id,
+        "name": "Test List",
+        "description": "Test Description",
+        "is_done": False
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Test List"
+    assert data["description"] == "Test Description"
+    assert data["is_done"] is False
+
+
+def test_router_list_get_all(test_app, db_session):
+    """Test getting all lists for a user"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="listuser", password="pass"))
+    crud.create_list(db_session, user.access_id, "List 1", "Desc 1", False)
+    crud.create_list(db_session, user.access_id, "List 2", "Desc 2", True)
+    
+    response = test_app.post("/api/list/list", json={
+        "access_id": user.access_id
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    assert data[0]["name"] == "List 1"
+    assert data[1]["name"] == "List 2"
+
+
+def test_router_list_get_by_id(test_app, db_session):
+    """Test getting list by ID"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="listuser", password="pass"))
+    created_list = crud.create_list(db_session, user.access_id, "Test List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    response = test_app.post("/api/list/list", json={
+        "access_id": user.access_id,
+        "id": str(list_id)
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == list_id
+
+
+def test_router_list_delete(test_app, db_session):
+    """Test list deletion endpoint"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="listuser", password="pass"))
+    created_list = crud.create_list(db_session, user.access_id, "Delete Me", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    response = test_app.post("/api/list/delete", json={
+        "access_id": user.access_id,
+        "id": str(list_id),
+        "name": None
+    })
+    assert response.status_code == 200
+    assert response.json() is True
+
+
+def test_router_task_create(test_app, db_session):
+    """Test task creation endpoint"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="taskuser", password="pass"))
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    response = test_app.post("/api/task/create", json={
+        "access_id": user.access_id,
+        "list_id": list_id,
+        "name": "Test Task",
+        "description": "Task Description",
+        "is_done": False
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Test Task"
+    assert data["description"] == "Task Description"
+    assert data["is_done"] is False
+    assert data["list_id"] == list_id
+
+
+def test_router_task_list_by_list_id(test_app, db_session):
+    """Test getting tasks by list ID"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="taskuser", password="pass"))
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    crud.create_task(db_session, user.access_id, list_id, "Task 1", "Desc 1", False)
+    crud.create_task(db_session, user.access_id, list_id, "Task 2", "Desc 2", True)
+    
+    response = test_app.post("/api/task/list", json={
+        "access_id": user.access_id,
+        "list_id": list_id
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    assert data[0]["name"] == "Task 1"
+    assert data[1]["name"] == "Task 2"
+
+
+def test_router_task_list_by_task_id(test_app, db_session):
+    """Test getting tasks by task ID"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="taskuser", password="pass"))
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    task = crud.create_task(db_session, user.access_id, list_id, "Task", "Desc", False)
+    
+    response = test_app.post("/api/task/list", json={
+        "access_id": user.access_id,
+        "id": task.id,
+        "list_id": 0
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == task.id
+
+
+def test_router_task_delete(test_app, db_session):
+    """Test task deletion endpoint"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="taskuser", password="pass"))
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    task = crud.create_task(db_session, user.access_id, list_id, "Delete Me", "Desc", False)
+    
+    response = test_app.post("/api/task/delete", json={
+        "access_id": user.access_id,
+        "id": task.id
+    })
+    assert response.status_code == 200
+    assert response.json() is True
+
+
+def test_router_task_update_is_done(test_app, db_session):
+    """Test task is_done update endpoint"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="taskuser", password="pass"))
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    task = crud.create_task(db_session, user.access_id, list_id, "Task", "Desc", False)
+    
+    response = test_app.post("/api/task/isdone", json={
+        "access_id": user.access_id,
+        "id": task.id,
+        "is_done": True
+    })
+    assert response.status_code == 200
+    
+    # Verify the task was updated
+    updated_task = crud.get_task_by_id(db_session, task.id)
+    assert updated_task.is_done is True
+
+
+def test_router_list_create_no_access_id(test_app, db_session):
+    """Test list creation with no access_id raises exception"""
+    response = test_app.post("/api/list/create", json={
+        "access_id": None,
+        "name": "Test",
+        "description": "Desc",
+        "is_done": False
+    })
+    assert response.status_code == 400
+    assert "Access ID is not specified" in response.json()["errorMsg"]
+
+
+def test_router_list_create_return_type(test_app, db_session):
+    """Test that list creation returns single dict not list"""
+    user = crud.create_user(db_session, schemas.UserCreate(username="returnuser", password="pass"))
+    
+    response = test_app.post("/api/list/create", json={
+        "access_id": user.access_id,
+        "name": "Test",
+        "description": "Desc",
+        "is_done": False
+    })
+    assert response.status_code == 200
+    data = response.json()
+    # Should be a dict, not a list
+    assert isinstance(data, dict)
+    assert "id" in data
+    assert "name" in data
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
