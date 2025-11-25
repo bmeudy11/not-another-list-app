@@ -603,5 +603,401 @@ def test_user_with_special_characters(db_session):
     assert user.password == "p@ss!w0rd#123"
 
 
+def test_get_list_by_id_not_found(db_session):
+    """Test retrieving non-existent list by ID returns empty list"""
+    result = crud.get_list_by_id(db_session, "999999")
+    assert len(result) == 0
+
+
+def test_delete_list_by_id_not_found(db_session):
+    """Test deleting non-existent list returns False"""
+    user_data = schemas.UserCreate(username="testuser", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    result = crud.delete_list(db_session, user.access_id, id="999999", name=None)
+    assert result is False
+
+
+def test_delete_list_by_name_not_found(db_session):
+    """Test deleting non-existent list by name returns False"""
+    user_data = schemas.UserCreate(username="testuser", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    result = crud.delete_list(db_session, user.access_id, id=None, name="NonExistent")
+    assert result is False
+
+
+def test_get_task_with_zero_list_id(db_session):
+    """Test get_task with list_id=0 returns tasks by id instead"""
+    user_data = schemas.UserCreate(username="taskuser", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    created_task = crud.create_task(db_session, user.access_id, list_id, "Task", "Desc", False)
+    
+    # When list_id=0, it should search by task id
+    tasks = crud.get_task(db_session, user.access_id, id=created_task.id, list_id=0)
+    assert len(tasks) == 1
+    assert tasks[0].id == created_task.id
+
+
+def test_delete_task_not_found(db_session):
+    """Test deleting non-existent task returns False"""
+    user_data = schemas.UserCreate(username="taskuser", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    result = crud.delete_task(db_session, user.access_id, 999999)
+    assert result is False
+
+
+def test_update_list_is_done_toggle(db_session):
+    """Test toggling list is_done status multiple times"""
+    user_data = schemas.UserCreate(username="listuser", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    created_list = crud.create_list(db_session, user.access_id, "Toggle", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    # Toggle to True
+    crud.update_list_is_done(db_session, user.access_id, list_id, True)
+    updated = crud.get_list_by_id(db_session, list_id)
+    assert updated[0]['is_done'] is True
+    
+    # Toggle back to False
+    crud.update_list_is_done(db_session, user.access_id, list_id, False)
+    updated = crud.get_list_by_id(db_session, list_id)
+    assert updated[0]['is_done'] is False
+
+
+def test_update_task_is_done_toggle(db_session):
+    """Test toggling task is_done status multiple times"""
+    user_data = schemas.UserCreate(username="taskuser", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    created_task = crud.create_task(db_session, user.access_id, list_id, "Task", "Desc", False)
+    
+    # Toggle to True
+    crud.update_task_is_done(db_session, user.access_id, created_task.id, True)
+    updated = crud.get_task_by_id(db_session, created_task.id)
+    assert updated.is_done is True
+    
+    # Toggle back to False
+    crud.update_task_is_done(db_session, user.access_id, created_task.id, False)
+    updated = crud.get_task_by_id(db_session, created_task.id)
+    assert updated.is_done is False
+
+
+#########################
+# Additional Schema Tests
+#########################
+
+def test_list_get_schema():
+    """Test ListGet schema"""
+    list_get = schemas.ListGet(access_id="test123", id="1")
+    assert list_get.access_id == "test123"
+    assert list_get.id == "1"
+
+
+def test_list_get_schema_no_id():
+    """Test ListGet schema without id"""
+    list_get = schemas.ListGet(access_id="test123")
+    assert list_get.access_id == "test123"
+    assert list_get.id is None
+
+
+def test_list_create_schema():
+    """Test ListCreate schema"""
+    list_create = schemas.ListCreate(
+        access_id="test123",
+        name="My List",
+        description="Description",
+        is_done=True
+    )
+    assert list_create.access_id == "test123"
+    assert list_create.name == "My List"
+    assert list_create.description == "Description"
+    assert list_create.is_done is True
+
+
+def test_list_create_schema_default_is_done():
+    """Test ListCreate schema with default is_done"""
+    list_create = schemas.ListCreate(
+        access_id="test123",
+        name="My List",
+        description="Description"
+    )
+    assert list_create.is_done is False
+
+
+def test_list_delete_schema():
+    """Test ListDelete schema"""
+    list_delete = schemas.ListDelete(access_id="test123", id="1", name="Test")
+    assert list_delete.access_id == "test123"
+    assert list_delete.id == "1"
+    assert list_delete.name == "Test"
+
+
+def test_list_return_schema():
+    """Test ListReturn schema"""
+    list_return = schemas.ListReturn(
+        id=1,
+        name="Test",
+        description="Desc",
+        is_done=False
+    )
+    assert list_return.id == 1
+    assert list_return.name == "Test"
+    assert list_return.description == "Desc"
+    assert list_return.is_done is False
+
+
+def test_task_get_schema():
+    """Test TaskGet schema"""
+    task_get = schemas.TaskGet(access_id="test123", id=1, list_id=2)
+    assert task_get.access_id == "test123"
+    assert task_get.id == 1
+    assert task_get.list_id == 2
+
+
+def test_task_get_schema_defaults():
+    """Test TaskGet schema with defaults"""
+    task_get = schemas.TaskGet(access_id="test123")
+    assert task_get.access_id == "test123"
+    assert task_get.id is None
+    assert task_get.list_id is None
+
+
+def test_task_create_schema():
+    """Test TaskCreate schema"""
+    task_create = schemas.TaskCreate(
+        access_id="test123",
+        list_id=1,
+        name="Task",
+        description="Desc",
+        is_done=True
+    )
+    assert task_create.access_id == "test123"
+    assert task_create.list_id == 1
+    assert task_create.name == "Task"
+    assert task_create.description == "Desc"
+    assert task_create.is_done is True
+
+
+def test_task_create_schema_default_is_done():
+    """Test TaskCreate schema with default is_done"""
+    task_create = schemas.TaskCreate(
+        access_id="test123",
+        list_id=1,
+        name="Task",
+        description="Desc"
+    )
+    assert task_create.is_done is False
+
+
+def test_task_delete_schema():
+    """Test TaskDelete schema"""
+    task_delete = schemas.TaskDelete(access_id="test123", id=1)
+    assert task_delete.access_id == "test123"
+    assert task_delete.id == 1
+
+
+def test_task_is_done_schema():
+    """Test TaskIsDone schema"""
+    task_is_done = schemas.TaskIsDone(access_id="test123", id=1, is_done=True)
+    assert task_is_done.access_id == "test123"
+    assert task_is_done.id == 1
+    assert task_is_done.is_done is True
+
+
+def test_task_is_done_schema_default():
+    """Test TaskIsDone schema with default"""
+    task_is_done = schemas.TaskIsDone(access_id="test123", id=1)
+    assert task_is_done.access_id == "test123"
+    assert task_is_done.id == 1
+    assert task_is_done.is_done is False
+
+
+def test_task_return_schema():
+    """Test TaskReturn schema"""
+    task_return = schemas.TaskReturn(
+        id=1,
+        list_id=2,
+        name="Task",
+        description="Desc",
+        is_done=True
+    )
+    assert task_return.id == 1
+    assert task_return.list_id == 2
+    assert task_return.name == "Task"
+    assert task_return.description == "Desc"
+    assert task_return.is_done is True
+
+
+def test_user_schema():
+    """Test User schema"""
+    user = schemas.User(id=1, username="testuser", access_id="access123")
+    assert user.id == 1
+    assert user.username == "testuser"
+    assert user.access_id == "access123"
+
+
+def test_logged_in_base_schema():
+    """Test LoggedInBase schema"""
+    logged_in = schemas.LoggedInBase(access_id="test123")
+    assert logged_in.access_id == "test123"
+
+
+def test_user_base_schema():
+    """Test UserBase schema"""
+    user_base = schemas.UserBase(username="testuser")
+    assert user_base.username == "testuser"
+
+
+#########################
+# More Coverage Tests   #
+#########################
+
+def test_multiple_tasks_same_list(db_session):
+    """Test creating multiple tasks for the same list"""
+    user_data = schemas.UserCreate(username="multitask", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    # Create 10 tasks
+    for i in range(10):
+        crud.create_task(db_session, user.access_id, list_id, f"Task {i}", f"Desc {i}", i % 2 == 0)
+    
+    tasks = crud.get_task(db_session, user.access_id, id=None, list_id=list_id)
+    assert len(tasks) == 10
+
+
+def test_get_task_by_id_not_found(db_session):
+    """Test get_task_by_id with non-existent id returns None"""
+    result = crud.get_task_by_id(db_session, 999999)
+    assert result is None
+
+
+def test_get_user_by_access_id_not_found(db_session):
+    """Test get_user_by_access_id with non-existent id returns None"""
+    result = crud.get_user_by_access_id(db_session, "nonexistent")
+    assert result is None
+
+
+def test_get_user_by_id_not_found(db_session):
+    """Test get_user_by_id with non-existent id returns None"""
+    result = crud.get_user_by_id(db_session, "999999")
+    assert result is None
+
+
+def test_create_list_with_is_done_true(db_session):
+    """Test creating list with is_done=True"""
+    user_data = schemas.UserCreate(username="doneuser", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    result = crud.create_list(db_session, user.access_id, "Done List", "Already done", True)
+    
+    assert len(result) == 1
+    assert result[0]['is_done'] is True
+
+
+def test_create_task_with_is_done_true(db_session):
+    """Test creating task with is_done=True"""
+    user_data = schemas.UserCreate(username="donetask", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    task = crud.create_task(db_session, user.access_id, list_id, "Done Task", "Already done", True)
+    
+    assert task.is_done is True
+
+
+def test_format_list_empty(db_session):
+    """Test format_list with empty list"""
+    formatted = crud.format_list(db_session, [])
+    assert len(formatted) == 0
+
+
+def test_task_with_long_description(db_session):
+    """Test creating task with long description"""
+    user_data = schemas.UserCreate(username="longdesc", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    long_desc = "A" * 250  # Long but within VARCHAR(255)
+    task = crud.create_task(db_session, user.access_id, list_id, "Task", long_desc, False)
+    
+    assert task.description == long_desc
+
+
+def test_list_with_long_description(db_session):
+    """Test creating list with long description"""
+    user_data = schemas.UserCreate(username="longlist", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    long_desc = "B" * 250  # Long but within VARCHAR(255)
+    result = crud.create_list(db_session, user.access_id, "List", long_desc, False)
+    
+    assert result[0]['description'] == long_desc
+
+
+def test_multiple_users_separate_lists(db_session):
+    """Test that multiple users have separate lists"""
+    user1 = crud.create_user(db_session, schemas.UserCreate(username="user1", password="pass1"))
+    user2 = crud.create_user(db_session, schemas.UserCreate(username="user2", password="pass2"))
+    
+    # User1 creates lists
+    crud.create_list(db_session, user1.access_id, "User1 List", "Desc", False)
+    
+    # User2 creates lists
+    crud.create_list(db_session, user2.access_id, "User2 List", "Desc", False)
+    
+    # Each user should only see their own list
+    user1_lists = crud.get_list(db_session, user1.access_id)
+    user2_lists = crud.get_list(db_session, user2.access_id)
+    
+    assert len(user1_lists) == 1
+    assert len(user2_lists) == 1
+    assert user1_lists[0]['name'] == "User1 List"
+    assert user2_lists[0]['name'] == "User2 List"
+
+
+def test_get_task_none_list_id(db_session):
+    """Test get_task with None list_id searches by task id"""
+    user_data = schemas.UserCreate(username="taskuser", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    created_list = crud.create_list(db_session, user.access_id, "List", "Desc", False)
+    list_id = created_list[0]['id']
+    
+    task1 = crud.create_task(db_session, user.access_id, list_id, "Task1", "Desc", False)
+    task2 = crud.create_task(db_session, user.access_id, list_id, "Task2", "Desc", False)
+    
+    # Get specific task by id with None list_id
+    tasks = crud.get_task(db_session, user.access_id, id=task1.id, list_id=None)
+    assert len(tasks) == 1
+    assert tasks[0].id == task1.id
+
+
+def test_exception_delete_list_no_id_or_name(db_session):
+    """Test deleting list with neither id nor name"""
+    user_data = schemas.UserCreate(username="testuser", password="pass")
+    user = crud.create_user(db_session, user_data)
+    
+    # Both id and name are None - should not delete anything
+    result = crud.delete_list(db_session, user.access_id, id=None, name=None)
+    assert result is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
