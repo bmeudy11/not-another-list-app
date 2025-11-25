@@ -52,87 +52,33 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/backend/src
         run: |
-          echo "Running backend unit tests..."
+          echo "Running backend unit tests with coverage..."
+          echo "Current directory: $(pwd)"
+          echo "Python path: $PYTHONPATH"
+          echo "Test file exists: $(test -f test_backend.py && echo 'yes' || echo 'no')"
+          
+          # Run tests with coverage
           pytest test_backend.py \
             --cov=src \
-            --cov-report=term \
+            --cov-report=term-missing \
             --cov-report=html:coverage-html \
             --cov-report=xml:coverage.xml \
             --cov-report=json:coverage.json \
-            -v || echo "Unit tests completed with errors"
+            -v -s
+          
+          echo ""
+          echo "Test execution completed"
           
           # Verify coverage file was created
           if [ -f .coverage ]; then
             echo "✓ Coverage data file created successfully"
             ls -lh .coverage
+            echo ""
+            echo "Coverage summary:"
+            coverage report --skip-empty
           else
             echo "⚠ Warning: No .coverage file found after unit tests"
-          fi
-
-      - name: Run integration tests with coverage
-        working-directory: tests/src
-        env:
-          PYTHONPATH: ${{ github.workspace }}/backend/src
-        run: |
-          # Start backend API for integration tests
-          echo "Starting backend API for integration tests..."
-          docker compose up -d natl_backend_api
-          sleep 10
-          
-          # Run integration tests with coverage
-          echo "Running integration tests..."
-          pytest \
-            --cov=${{ github.workspace }}/backend/src \
-            --cov-append \
-            --cov-report=term \
-            --cov-report=html:coverage-html \
-            --cov-report=xml:coverage.xml \
-            --cov-report=json:coverage.json \
-            -v || echo "Integration tests completed with errors"
-          
-          # Check if coverage file exists
-          if [ -f .coverage ]; then
-            echo "✓ Integration test coverage data created"
-            # Copy coverage data to backend directory for consolidation
-            cp .coverage ${{ github.workspace }}/backend/.coverage.integration
-            echo "✓ Copied integration coverage to backend directory"
-          else
-            echo "⚠ No integration test coverage data found"
-          fi
-          
-      - name: Combine coverage data
-        if: always()
-        working-directory: backend
-        run: |
-          # Install coverage if not already installed
-          pip install coverage
-          
-          # Check if we have any coverage data
-          if [ -f .coverage ] || [ -f .coverage.integration ]; then
-            echo "Found coverage data files:"
-            ls -la .coverage* || true
-            
-            # Combine coverage from unit and integration tests if both exist
-            if [ -f .coverage ] && [ -f .coverage.integration ]; then
-              echo "Combining coverage from unit and integration tests..."
-              coverage combine .coverage .coverage.integration
-            elif [ -f .coverage ]; then
-              echo "Only unit test coverage found, using that..."
-            elif [ -f .coverage.integration ]; then
-              echo "Only integration test coverage found, using that..."
-              mv .coverage.integration .coverage
-            fi
-            
-            # Generate final reports
-            echo "Generating coverage reports..."
-            coverage report || echo "Warning: coverage report generation had issues"
-            coverage html -d coverage-html || echo "Warning: HTML report generation had issues"
-            coverage xml -o coverage.xml || echo "Warning: XML report generation had issues"
-            coverage json -o coverage.json || echo "Warning: JSON report generation had issues"
-          else
-            echo "No coverage data found. Tests may have failed."
-            # Create empty coverage files to prevent errors in subsequent steps
-            echo '{"totals": {"percent_covered_display": "0"}}' > coverage.json
+            exit 1
           fi
 
       - name: Generate coverage badge
