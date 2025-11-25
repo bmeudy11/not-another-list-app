@@ -535,7 +535,7 @@ def test_get_list_no_access_id(db_session):
     with pytest.raises(DefaultException) as exc_info:
         crud.get_list(db_session, access_id=None)
     
-    assert "Access ID is not specified" in str(exc_info.value)
+    assert "Access ID is not specified" in exc_info.value.msg
 
 
 def test_create_list_no_access_id(db_session):
@@ -545,7 +545,7 @@ def test_create_list_no_access_id(db_session):
     with pytest.raises(DefaultException) as exc_info:
         crud.create_list(db_session, access_id=None, name="Test", description="Desc", is_done=False)
     
-    assert "Access ID is not specified" in str(exc_info.value)
+    assert "Access ID is not specified" in exc_info.value.msg
 
 
 def test_delete_list_no_access_id(db_session):
@@ -555,7 +555,7 @@ def test_delete_list_no_access_id(db_session):
     with pytest.raises(DefaultException) as exc_info:
         crud.delete_list(db_session, access_id=None, id="1", name="Test")
     
-    assert "Access ID is not specified" in str(exc_info.value)
+    assert "Access ID is not specified" in exc_info.value.msg
 
 
 #########################
