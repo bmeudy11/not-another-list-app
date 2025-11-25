@@ -10,6 +10,7 @@ import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from fastapi.testclient import TestClient
 
 # Add src directory to path
 src_path = os.path.join(os.path.dirname(__file__), 'src')
