@@ -239,18 +239,18 @@ jobs:
               echo "FRONTEND_BADGE_COLOR=red" >> $GITHUB_ENV
             fi
             
-            # Report coverage (informational - doesn't fail build)
+            # Fail if coverage is below 80%
             if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-              echo "⚠️ Coverage ${COVERAGE}% is below the recommended 80% threshold"
-              echo "Note: Frontend coverage is informational and does not block the build"
+              echo "❌ Coverage ${COVERAGE}% is below the required 80% threshold"
+              exit 1
             else
               echo "✅ Coverage ${COVERAGE}% meets the 80% threshold"
             fi
           else
-            echo "⚠️ Coverage report not found"
-            echo "FRONTEND_COVERAGE=N/A" >> $GITHUB_ENV
-            echo "FRONTEND_BADGE_COLOR=lightgrey" >> $GITHUB_ENV
-            echo "Note: Frontend coverage check is informational only"
+            echo "❌ Coverage report not found"
+            echo "FRONTEND_COVERAGE=0" >> $GITHUB_ENV
+            echo "FRONTEND_BADGE_COLOR=red" >> $GITHUB_ENV
+            exit 1
           fi
 
       - name: Upload frontend coverage report
