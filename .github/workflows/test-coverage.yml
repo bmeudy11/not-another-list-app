@@ -18,12 +18,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and start services with Docker Compose
-        run: |
-          docker compose build db natl_backend_api
-          docker compose up -d db natl_backend_api
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-      - name: Wait for services to be ready
+      - name: Install backend dependencies and coverage tools
+        run: |
+          cd backend/src
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-cov coverage
+
+      - name: Build and start database
+        run: |
+          docker compose build db
+          docker compose up -d db
+
+      - name: Wait for database to be ready
         run: |
           echo "Waiting for database to be ready..."
           for i in {1..30}; do
@@ -34,32 +46,62 @@ jobs:
             echo "Waiting..."
             sleep 2
           done
+
+      - name: Run backend unit tests with coverage
+        working-directory: backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend/src
+        run: |
+          pytest test_backend.py \
+            --cov=src \
+            --cov-report=term \
+            --cov-report=html:coverage-html \
+            --cov-report=xml:coverage.xml \
+            --cov-report=json:coverage.json \
+            -v || true
+
+      - name: Run integration tests with coverage
+        working-directory: tests/src
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend/src
+        run: |
+          # Start backend API for integration tests
+          docker compose up -d natl_backend_api
+          sleep 10
           
-          echo "Waiting for backend API to be ready..."
-          sleep 5
-
-      - name: Run tests with coverage in Docker
+          # Run integration tests with coverage
+          pytest \
+            --cov=${{ github.workspace }}/backend/src \
+            --cov-append \
+            --cov-report=term \
+            --cov-report=html:coverage-html \
+            --cov-report=xml:coverage.xml \
+            --cov-report=json:coverage.json \
+            -v || true
+          
+          # Copy coverage data to backend directory for consolidation
+          cp .coverage ${{ github.workspace }}/backend/.coverage.integration || true
+          
+      - name: Combine coverage data
+        working-directory: backend
         run: |
-          docker compose run --rm -e PYTEST_ADDOPTS="--cov=/app/backend/src --cov-report=term --cov-report=html:/app/tests/src/coverage-html --cov-report=xml:/app/tests/src/coverage.xml --cov-report=json:/app/tests/src/coverage.json -v" test || true
-      
-      - name: Copy coverage files from container
-        run: |
-          # Create a temporary container to copy files from
-          CONTAINER_ID=$(docker compose create test)
-          docker cp ${CONTAINER_ID}:/app/tests/src/coverage-html ./tests/src/coverage-html || true
-          docker cp ${CONTAINER_ID}:/app/tests/src/coverage.xml ./tests/src/coverage.xml || true
-          docker cp ${CONTAINER_ID}:/app/tests/src/coverage.json ./tests/src/coverage.json || true
-          docker cp ${CONTAINER_ID}:/app/tests/src/.coverage ./tests/src/.coverage || true
-          docker rm ${CONTAINER_ID} || true
-
-      - name: Set up Python for coverage processing
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
+          # Install coverage if not already installed
+          pip install coverage
+          
+          # Combine coverage from unit and integration tests
+          if [ -f .coverage.integration ]; then
+            coverage combine .coverage .coverage.integration
+          fi
+          
+          # Generate final reports
+          coverage report
+          coverage html -d coverage-html
+          coverage xml -o coverage.xml
+          coverage json -o coverage.json
 
       - name: Generate coverage badge
         if: always()
-        working-directory: tests/src
+        working-directory: backend
         run: |
           if [ -f coverage.json ]; then
             COVERAGE=$(python -c "import json; data=json.load(open('coverage.json')); print(data['totals']['percent_covered_display'])")
@@ -98,7 +140,7 @@ jobs:
         if: always()
         with:
           name: backend-coverage-report
-          path: tests/src/coverage-html/
+          path: backend/coverage-html/
           retention-days: 30
 
       - name: Upload backend coverage XML
@@ -106,7 +148,7 @@ jobs:
         if: always()
         with:
           name: backend-coverage-xml
-          path: tests/src/coverage.xml
+          path: backend/coverage.xml
           retention-days: 30
 
       - name: Comment coverage on PR
