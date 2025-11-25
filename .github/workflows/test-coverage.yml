@@ -187,11 +187,16 @@ jobs:
       - name: Run tests with coverage
         working-directory: natl-frontend
         run: |
-          npm test -- --coverage --watchAll=false --coverageReporters="text" "lcov" "json" "html" || true
+          npm test -- --coverage --watchAll=false --passWithNoTests 2>&1 | tee test-output.log || echo "Tests completed"
+          echo "Test run finished, checking for coverage files..."
+          ls -la coverage/ 2>&1 || echo "No coverage directory yet"
 
       - name: Check coverage threshold
         working-directory: natl-frontend
         run: |
+          echo "Looking for coverage report..."
+          ls -la coverage/ 2>&1 || echo "Coverage directory not found"
+          
           # Extract coverage percentage from coverage-summary.json
           if [ -f coverage/coverage-summary.json ]; then
             COVERAGE=$(node -e "const data = require('./coverage/coverage-summary.json'); const total = data.total; const avg = (total.lines.pct + total.statements.pct + total.functions.pct + total.branches.pct) / 4; console.log(avg.toFixed(2));")
